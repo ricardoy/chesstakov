@@ -1,8 +1,9 @@
 import sys
 import os
-import chess, chess.pgn
+import chess
+import chess.pgn
+import numpy as np
 import random
-from tqdm import tqdm
 
 
 class GamePositionsIterator:
@@ -45,8 +46,7 @@ class GamePositionsIterator:
             if (game_state.board().fullmove_number <= 5):
                 break
             total_pieces = self._count_pieces(game_state)
-            if game_state.board().turn == chess.BLACK and \
-                    total_pieces == previous_total_pieces:
+            if total_pieces == previous_total_pieces:
                 positions.append(game_state)
             previous_game_state = game_state
             previous_total_pieces = total_pieces
@@ -68,7 +68,60 @@ class GamePositionsIterator:
 
 
 def position_to_vector(position):
-    return str(position)
+    """Converts a position into int8 list.
+
+    For each of the 64 squares, there is a one-hot representation
+    for the following 7 fields:
+        Color: if there is a White piece
+        Pawn
+        Knight
+        Bishop
+        Rook
+        Queen
+        King
+
+    The last 5 positions are:
+        Turn: if White is playing
+        White can castle kingside
+        White can castle queenside
+        Black can castle kingside
+        Black can castle queenside
+    """
+    x = np.zeros(768 + 5, dtype=np.int8)
+    board = position.board()
+    for i in range(0, 64):
+        piece = board.piece_at(i)
+        if piece is not None:
+            base_offset = i * 7
+            if piece.color == chess.WHITE:
+                x[base_offset] = 1
+            if piece.piece_type == chess.PAWN:
+                x[base_offset + 1] = 1
+            elif piece.piece_type == chess.KNIGHT:
+                x[base_offset + 2] = 1
+            elif piece.piece_type == chess.BISHOP:
+                x[base_offset + 3] = 1
+            elif piece.piece_type == chess.ROOK:
+                x[base_offset + 4] = 1
+            elif piece.piece_type == chess.QUEEN:
+                x[base_offset + 5] = 1
+            elif piece.piece_type == chess.KING:
+                x[base_offset + 6] = 1
+            else:
+                raise Exception('invalid piece type {}'.format(piece))
+
+    if (board.turn == chess.WHITE):
+        x[768] = 1
+    if (board.has_kingside_castling_rights(chess.WHITE)):
+        x[769] = 1
+    if (board.has_queenside_castling_rights(chess.WHITE)):
+        x[770] = 1
+    if (board.has_kingside_castling_rights(chess.BLACK)):
+        x[771] = 1
+    if (board.has_queenside_castling_rights(chess.BLACK)):
+        x[772] = 1
+
+    return x
 
 
 def parse(input_dir, output_file):
@@ -87,7 +140,9 @@ def parse(input_dir, output_file):
             if (positions is None):
                 break
             for position in positions:
-                out.write(position_to_vector(position))
+                x = position_to_vector(position)
+                print x
+                out.write(x)
                 out.write('\n')
 
     out.close()
