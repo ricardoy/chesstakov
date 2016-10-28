@@ -4,6 +4,9 @@ import chess
 import chess.pgn
 import numpy as np
 import random
+import h5py
+import multiprocessing
+from tqdm import tqdm
 
 
 class GamePositionsIterator:
@@ -23,10 +26,13 @@ class GamePositionsIterator:
     def random_positions(self):
         while (not self.end):
             game = self._next_game_no_draw()
-            if (game is None):
+            if game is None:
                 continue
-            return self._get_n_random_states(game, 10)
-        return None
+            if game.headers['Result'] == '1-0':
+                return (chess.WHITE, self._get_n_random_states(game, 10))
+            else:
+                return (chess.BLACK, self._get_n_random_states(game, 10))
+        return (None, None)
 
     def _count_pieces(self, game_state):
         board = game_state.board()
@@ -67,8 +73,8 @@ class GamePositionsIterator:
                 return game
 
 
-def position_to_vector(position):
-    """Converts a position into int8 list.
+def position_to_vector(board):
+    """Converts a board into int8 list.
 
     For each of the 64 squares, there is a one-hot representation
     for the following 7 fields:
@@ -88,7 +94,6 @@ def position_to_vector(position):
         Black can castle queenside
     """
     x = np.zeros(768 + 5, dtype=np.int8)
-    board = position.board()
     for i in range(0, 64):
         piece = board.piece_at(i)
         if piece is not None:
@@ -124,32 +129,70 @@ def position_to_vector(position):
     return x
 
 
-def parse(input_dir, output_file):
+def parse_all(input_dir, output_dir):
     files = []
     for f in os.listdir(input_dir):
         if not f.lower().endswith('.pgn'):
             continue
-        path = os.path.join(input_dir, f)
-        files.append(path)
+        input_file = os.path.join(input_dir, f)
+        output_file = os.path.join(output_dir, '{}.h5'.format(f))
+        files.append((input_file, output_file))
 
-    out = open(output_file, 'w')
-    for f in files:
-        it = GamePositionsIterator(f)
-        while True:
-            positions = it.random_positions()
-            if (positions is None):
-                break
-            for position in positions:
-                x = position_to_vector(position)
-                print x
-                out.write(x)
-                out.write('\n')
+    pool = multiprocessing.Pool()
+    pool.map(parse_aux, files)
 
-    out.close()
+
+def parse_aux(files):
+    return parse(*files)
+
+
+def parse(input_file, output_file):
+    if os.path.isfile(output_file):
+        print 'Output file {} already processed.'.format(output_file)
+        return
+    print '<a:{} b:{}>'.format(input_file, output_file)
+    temp_file = '{}.temp'.format(output_file)
+    h5 = h5py.File(temp_file, 'w')
+    h5_group = h5.create_group('chess')
+
+    idx_white = 0
+    limit_white = 15000
+    X_white = h5_group.create_dataset('X_white', (limit_white, 768 + 5), chunks=True, maxshape=(None, 768 + 5), dtype='b')
+
+    idx_black = 0
+    limit_black = 15000
+    X_black = h5_group.create_dataset('X_black', (limit_black, 768 + 5), chunks=True, maxshape=(None, 768 + 5), dtype='b')
+
+    it = GamePositionsIterator(input_file)
+    while True:
+        winner, positions = it.random_positions()
+        if (positions is None):
+            break
+        for position in positions:
+            x = position_to_vector(position.board())
+            if winner == chess.WHITE:
+                if idx_white + 1 > limit_white:
+                    limit_white = limit_white * 2
+                    X_white.resize(size=limit_white, axis=0)
+                X_white[idx_white] = x
+                idx_white = idx_white + 1
+            else:
+                if idx_black + 1 > limit_black:
+                    limit_black = limit_black * 2
+                    X_black.resize(size=limit_black, axis=0)
+                X_black[idx_black] = x
+                idx_black = idx_black + 1
+
+    X_white.resize(size=idx_white, axis=0)
+    X_black.resize(size=idx_black, axis=0)
+
+    h5.close()
+
+    os.rename(temp_file, output_file)
 
 
 if __name__ == '__main__':
     if (len(sys.argv) < 3):
-        print '$ parser.py <directory> <outputfile>'
+        print '$ parser.py <input directory> <output directory>'
         sys.exit(-1)
-    parse(sys.argv[1], sys.argv[2])
+    parse_all(sys.argv[1], sys.argv[2])
