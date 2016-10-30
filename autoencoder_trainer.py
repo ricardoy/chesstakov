@@ -18,10 +18,7 @@ decoded3 = Dense(600, activation='relu')(decoded2)
 decoded4 = Dense(773, activation='sigmoid')(decoded3)
 
 autoencoder = Model(input=chess_board, output=decoded4)
-
-# this model maps an input to its encoded representation
 encoder = Model(input=chess_board, output=encoded4)
-
 autoencoder.compile(optimizer='adadelta', loss='binary_crossentropy')
 
 
