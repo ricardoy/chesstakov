@@ -31,7 +31,7 @@ def autoencoder_train(input_file, model_file):
         X_black = h5.get('chess/X_black')
 
         autoencoder.fit(X_white, X_white,
-                        nb_epoch=10,
+                        nb_epoch=20,
                         batch_size=256,
                         shuffle='batch',
                         validation_data=(X_black, X_black))
