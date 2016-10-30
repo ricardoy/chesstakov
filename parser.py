@@ -6,7 +6,6 @@ import numpy as np
 import random
 import h5py
 import multiprocessing
-from tqdm import tqdm
 
 
 class GamePositionsIterator:
