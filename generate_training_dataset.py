@@ -9,7 +9,7 @@ def create_dataset(output_filename, dimension=(None, None)):
     group = h5.create_group('chess')
     X1 = group.create_dataset('X1', dimension, dtype='b')
     X2 = group.create_dataset('X2', dimension, dtype='b')
-    y = group.create_dataset('y', (dimension[0], 1))
+    y = group.create_dataset('y', (dimension[0], 2))
     return h5, X1, X2, y
 
 
@@ -38,11 +38,11 @@ def main(input_filename, output_filename):
         if (np.random.randint(0, 2) == 0):
             X1[i] = X_white[white_indexes[i]]
             X2[i] = X_black[black_indexes[i]]
-            y[i] = 0
+            y[i] = [1, 0]
         else:
             X1[i] = X_black[black_indexes[i]]
             X2[i] = X_white[white_indexes[i]]
-            y[i] = 1
+            y[i] = np.array([0, 1])
 
     input_h5.close()
     output_h5.close()
