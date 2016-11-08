@@ -2,6 +2,11 @@
 
 A deep neural network based chess program.
 
+## Dependencies:
+
+- flask
+- flask-cors
+
 ## Steps:
 
 1. Run:
