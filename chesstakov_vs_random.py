@@ -1,11 +1,9 @@
 import chess
 import random
 import numpy as np
-import h5py
 import sys
 from parser import position_to_vector
 from keras.models import load_model
-from tqdm import tqdm
 
 
 def choose_random_position(board):
@@ -18,6 +16,18 @@ def choose_random_position(board):
         moves.append(str(move))
         board.pop()
     return random.choice(moves)
+
+
+def compare_positions(model, p1, p2):
+    X1 = np.array([p1])
+    X2 = np.array([p2])
+
+    r = model.predict(X1, X2)
+
+    if (r[0][0] > 0.5):
+        return 0
+    else:
+        return 1
 
 
 def choose_not_so_random_position(model, board):

@@ -92,7 +92,7 @@ def position_to_vector(board):
         Black can castle kingside
         Black can castle queenside
     """
-    x = np.zeros(768 + 5, dtype=np.int8)
+    x = np.zeros(768 + 5, dtype=np.bool)
     for i in range(0, 64):
         piece = board.piece_at(i)
         if piece is not None:
@@ -155,12 +155,12 @@ def parse(input_file, output_file):
     h5_group = h5.create_group('chess')
 
     idx_white = 0
-    limit_white = 15000
-    X_white = h5_group.create_dataset('X_white', (limit_white, 768 + 5), chunks=True, maxshape=(None, 768 + 5), dtype='b')
+    white_maximum_size = 15000
+    X_white = h5_group.create_dataset('X_white', (white_maximum_size, 768 + 5), chunks=True, maxshape=(None, 768 + 5), dtype=np.bool)
 
     idx_black = 0
-    limit_black = 15000
-    X_black = h5_group.create_dataset('X_black', (limit_black, 768 + 5), chunks=True, maxshape=(None, 768 + 5), dtype='b')
+    black_maaximum_size = 15000
+    X_black = h5_group.create_dataset('X_black', (black_maaximum_size, 768 + 5), chunks=True, maxshape=(None, 768 + 5), dtype=np.bool)
 
     it = GamePositionsIterator(input_file)
     while True:
@@ -170,15 +170,15 @@ def parse(input_file, output_file):
         for position in positions:
             x = position_to_vector(position.board())
             if winner == chess.WHITE:
-                if idx_white + 1 > limit_white:
-                    limit_white = limit_white * 2
-                    X_white.resize(size=limit_white, axis=0)
+                if idx_white + 1 > white_maximum_size:
+                    white_maximum_size = white_maximum_size * 2
+                    X_white.resize(size=white_maximum_size, axis=0)
                 X_white[idx_white] = x
                 idx_white = idx_white + 1
             else:
-                if idx_black + 1 > limit_black:
-                    limit_black = limit_black * 2
-                    X_black.resize(size=limit_black, axis=0)
+                if idx_black + 1 > black_maaximum_size:
+                    black_maaximum_size = black_maaximum_size * 2
+                    X_black.resize(size=black_maaximum_size, axis=0)
                 X_black[idx_black] = x
                 idx_black = idx_black + 1
 

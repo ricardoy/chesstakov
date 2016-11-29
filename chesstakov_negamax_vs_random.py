@@ -37,7 +37,8 @@ def negamax_base(model, board):
     base_position = position_to_vector(board)
     alpha = float('-inf')
     beta = float('inf')
-    return negamax(model, base_position, board, 3, alpha, beta, 0)
+    score, move = negamax(model, base_position, board, 3, alpha, beta, 0)
+    return move
 
 
 def negamax(model, base_position, board, depth, alpha, beta, color):
@@ -50,7 +51,7 @@ def negamax(model, base_position, board, depth, alpha, beta, color):
         board.pop()
 
     if (len(X) <= 0):
-        return Exception('')
+        return Exception(''), Exception()
 
     X_base = np.repeat([base_position], len(X), axis=0)
 
@@ -103,7 +104,7 @@ def main(model_filename):
             play = None
             if (turn == chess.WHITE):
                 number_turns = number_turns + 1
-                _, play = negamax_base(chesstakov, board)
+                play = negamax_base(chesstakov, board)
                 turn = chess.BLACK
             else:
                 play = choose_random_position(board)

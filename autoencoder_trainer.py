@@ -1,54 +1,52 @@
+import argparse
 import h5py
-import sys
-import os
-from keras.layers import Input, Dense
-from keras.models import Model
+import os.path
+import keras
+from model import generate_autoencoder
 
 
-encoding_dim = 100
+class LossHistory(keras.callbacks.Callback):
+    def __init__(self):
+        self.logs = []
 
-chess_board = Input(shape=(773,))
-encoded1 = Dense(600, activation='relu')(chess_board)
-encoded2 = Dense(400, activation='relu')(encoded1)
-encoded3 = Dense(200, activation='relu')(encoded2)
-encoded4 = Dense(encoding_dim, activation='relu')(encoded3)
-decoded1 = Dense(200, activation='relu')(encoded4)
-decoded2 = Dense(400, activation='relu')(decoded1)
-decoded3 = Dense(600, activation='relu')(decoded2)
-decoded4 = Dense(773, activation='sigmoid')(decoded3)
-
-autoencoder = Model(input=chess_board, output=decoded4)
-encoder = Model(input=chess_board, output=encoded4)
-autoencoder.compile(optimizer='adadelta', loss='binary_crossentropy')
+    def on_epoch_end(self, epoch, logs={}):
+        self.logs.append(logs)
 
 
-def autoencoder_train(input_file, model_file):
+def train(input_file, output_directory, log_file):
+    full_autoencoder, autoencoder = generate_autoencoder()
+    full_autoencoder.compile(optimizer='adadelta', loss='binary_crossentropy')
+
+    history = LossHistory()
+
+    output_filepath = os.path.join(output_directory, 'model.epoch_{epoch:03d}.loss_{val_loss:.4f}.h5')
+    checkpoint = keras.callbacks.ModelCheckpoint(output_filepath, monitor='val_loss', verbose=0,
+                                                 save_best_only=False, save_weights_only=False, mode='auto')
+
     with h5py.File(input_file) as h5:
-        X_white = h5.get('chess/X_white')
-        X_black = h5.get('chess/X_black')
+        X_train = h5.get('chess/X_train')
+        X_test = h5.get('chess/X_test')
 
-        autoencoder.fit(X_white, X_white,
-                        nb_epoch=20,
-                        batch_size=256,
-                        shuffle='batch',
-                        validation_data=(X_black, X_black))
+        full_autoencoder.fit(X_train, X_train,
+                             nb_epoch=300,
+                             batch_size=256,
+                             shuffle='batch',
+                             verbose=2,
+                             validation_data=(X_test, X_test),
+                             callbacks=[history, checkpoint])
 
-        encoder.save(model_file)
-
-
-def train(input_directory, output_directory):
-    total_steps = 1
-    for f in os.listdir(input_directory):
-        if not f.lower().endswith('.h5'):
-            continue
-        input_file = os.path.join(input_directory, f)
-        model_file = os.path.join(output_directory, '{}.h5'.format(total_steps))
-        autoencoder_train(input_file, model_file)
-        total_steps = total_steps + 1
+        with open(log_file, 'w') as f:
+            for x in history.logs:
+                f.write(str(x))
+                f.write('\n')
 
 
 if __name__ == '__main__':
-    if (len(sys.argv) < 3):
-        print '$ parser.py <input directory> <output directory>'
-        sys.exit(-1)
-    train(sys.argv[1], sys.argv[2])
+    parser = argparse.ArgumentParser(description='Autoencoder trainer')
+    parser.add_argument('-input', type=str, help='HDF5 input file')
+    parser.add_argument('-output', type=str, help='Directory where models will be saved')
+    parser.add_argument('-log', type=str, help='Log file')
+
+    args = parser.parse_args()
+
+    train(args.input, args.output, args.log)

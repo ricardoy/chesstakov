@@ -1,6 +1,7 @@
 import h5py
 import os
 import sys
+import numpy as np
 from tqdm import tqdm
 
 
@@ -23,8 +24,8 @@ def main(input_directory, output_file):
 
     big_h5 = h5py.File(output_file, 'w')
     group = big_h5.create_group('chess')
-    X_white = group.create_dataset('X_white', (total_rows_white, 768 + 5), dtype='b')
-    X_black = group.create_dataset('X_black', (total_rows_black, 768 + 5), dtype='b')
+    X_white = group.create_dataset('X_white', (total_rows_white, 768 + 5), dtype=np.bool)
+    X_black = group.create_dataset('X_black', (total_rows_black, 768 + 5), dtype=np.bool)
 
     offset_white = 0
     offset_black = 0

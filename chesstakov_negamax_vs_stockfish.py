@@ -1,19 +1,14 @@
 import chess
+import chess.uci
 import random
 import numpy as np
 import sys
 from parser import position_to_vector
 from keras.models import load_model
-from flask import Flask
-from flask import jsonify
-from flask_cors import CORS
-
-app = Flask(__name__)
-CORS(app)
 
 
 CHECKMATE_SCORE = 10
-MAX_DEPTH = 4
+MAX_DEPTH = 3
 
 
 def choose_random_position(board):
@@ -58,13 +53,11 @@ def negamax(model, base_position, board, depth, alpha, beta, color):
         board.pop()
 
     if (len(X) <= 0):
-        print 'erro!!!!!!!'
-        print board
-        return '', ''
+        return Exception(''), Exception()
 
     X_base = np.repeat([base_position], len(X), axis=0)
 
-    scores = model.predict([np.array(X), X_base], batch_size=2048)
+    scores = model.predict([np.array(X), X_base])
     scores = scores[:, color]
 
     for i, move in enumerate(moves):
@@ -76,79 +69,66 @@ def negamax(model, base_position, board, depth, alpha, beta, color):
     child_nodes = sorted(zip(scores, moves), reverse=True)
 
     best_value = float('-inf')
-    best_move = ''
+    best_move = None
 
     for score, move in child_nodes:
-        analyze = True
         if depth == 1 or score == CHECKMATE_SCORE:
             value = score
         else:
             board.push(chess.Move.from_uci(move))
             neg_value, _ = negamax(model, base_position, board, depth - 1, -alpha, -beta, 1 - color)
-            if (neg_value == ''):
-                analyze = False
-            else:
-                value = -neg_value
-                board.pop()
+            value = -neg_value
+            board.pop()
 
-        if analyze:
-            if value > best_value:
-                best_value = value
-                best_move = move
+        if value > best_value:
+            best_value = value
+            best_move = move
 
-            if value > alpha:
-                alpha = value
+        if value > alpha:
+            alpha = value
 
-            if alpha > beta:
-                break
+        if alpha > beta:
+            break
 
     return best_value, best_move
 
 
-class Chesstakov:
-    def __init__(self, filename):
-        self.board = None
-        self.model = load_model(filename)
+def main(model_filename):
+    engine = chess.uci.popen_engine("/usr/games/stockfish")
+    engine.uci
+    chesstakov = load_model(model_filename)
+    white = .0
+    black = .0
+    tie = .0
+    while True:
+        board = chess.Board()
+        turn = chess.WHITE
+        number_turns = 0
+        while (not board.result() != '*'):
+            if (turn == chess.WHITE):
+                number_turns = number_turns + 1
+                board.push(chess.Move.from_uci(negamax_base(chesstakov, board)))
+                turn = chess.BLACK
+            else:
+                engine.position(board)
+                board.push(engine.go(depth=1).bestmove)
+                turn = chess.WHITE
 
+        r = board.result()
+        if (r == '1-0'):
+            white = white + 1
+        elif (r == '0-1'):
+            black = black + 1
+        else:
+            tie = tie + 1
 
-@app.route('/init')
-def init():
-    engine.board = chess.Board()
-    return ''
-
-
-@app.route('/generate_move')
-def generate_move():
-    print engine.board.fen()
-    move = negamax_base(engine.model, engine.board)
-    if move == '':
-        return ''
-    engine.board.push(chess.Move.from_uci(move))
-    r = dict()
-    r['from'] = move[:2]
-    r['to'] = move[2:4]
-    r['promotion'] = 'q'
-    print engine.board
-    check_end()
-    return jsonify(**r)
-
-
-@app.route('/move/<source>/<to>/<promotion>')
-def receive_move(source, to, promotion):
-    # print '{} {} {}'.format(source, to, promotion)
-    # return str(engine.board)
-    if promotion == 'undefined':
-        promotion = ''
-    engine.board.push(chess.Move.from_uci('{}{}{}'.format(source, to, promotion)))
-    check_end()
-    return ''
-
-
-def check_end():
-    if (engine.board.result() != '*'):
-        print engine.board.result()
+        total = white + black + tie
+        print 'white: %d (%.3f) black: %d (%.3f) tie: %d (%.3f)' % \
+            (white, (100 * white / total), black, 100 * black / total, tie, 100 * tie / total)
 
 
 if __name__ == '__main__':
-    engine = Chesstakov(sys.argv[1])
-    app.run()
+    if (len(sys.argv) == 2):
+        main(sys.argv[1])
+    else:
+        print 'Parameter model is obligatory.'
