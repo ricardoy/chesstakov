@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<!-- saved from url=(0037)http://chessboardjs.com/examples/5001 -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <title>Chesstakov</title>
+  <!--<base href="http://chessboardjs.com/">--><base href=".">
+
+  <link rel="stylesheet" href="./css/chessboard.css">
+</head>
+<body>
+
+<script src="./js/chess.js"></script>
+<script src="./js/json3.min.js"></script>
+<script src="./js/jquery-1.10.1.min.js"></script>
+<script src="./js/chessboard.js"></script>
+<script>
+var init = function() {
+
+//--- start example JS ---
+var board,
+  game = new Chess();
+
+var endgame = false;
+
+// do not pick up pieces if the game is over
+// only pick up pieces for White
+var onDragStart = function(source, piece, position, orientation) {
+  if (game.in_checkmate() === true || game.in_draw() === true ||
+    piece.search(/^w/) !== -1) {
+    return false;
+  }
+};
+
+var boardInit = function() {
+  $.getJSON('http://localhost:5000/init', function(data){    
+  });
+}
+
+var makeMove = function() {
+  $.getJSON('http://localhost:5000/generate_move', function(data){
+    game.move(data);
+    board.position(game.fen());
+
+    if (!endgame) {
+      if (game.in_checkmate() === true) {
+        alert ('white wins')
+        endgame = true;
+        return;
+      } 
+      if (game.in_draw() === true) {
+        alert ('tie');
+        endgame = true;
+        return;
+      }
+    }
+  });
+}; 
+
+var onDrop = function(source, target) {
+  
+  // see if the move is legal
+  var move = game.move({
+    promotion: 'q',
+    from: source,
+    to: target // NOTE: always promote to a queen for example simplicity    
+  });
+
+  // illegal move
+  if (move === null) return 'snapback';
+
+  if (!endgame) {
+    if (game.in_checkmate() === true) {
+      alert ('black wins')
+      endgame = true
+      return;
+    } 
+    if (game.in_draw() === true) {
+      alert ('tie');
+      endgame = true;
+    return;
+    }
+  }
+
+  
+  $.get('http://localhost:5000/move/' + move.from + '/' + move.to + '/' + move.promotion, function() {
+  
+  });
+
+  
+  // make random legal move for black
+  window.setTimeout(makeMove, 250);
+};
+
+// update the board position after the piece snap
+// for castling, en passant, pawn promotion
+var onSnapEnd = function() {
+  board.position(game.fen());  
+};
+
+var cfg = {
+  showNotation: false,
+  orientation: 'black',
+  draggable: true,
+  position: 'start',
+  onDragStart: onDragStart,
+  onDrop: onDrop,
+  onSnapEnd: onSnapEnd
+};
+board = ChessBoard('board', cfg);
+boardInit()
+window.setTimeout(makeMove, 250);
+
+//--- end example JS ---
+
+}; // end init()
+$(document).ready(init);
+</script>
+
+<div id="board" style="width: 400px; margin: auto"></div>
+
+</body></html>
